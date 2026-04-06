@@ -26,38 +26,78 @@ module tb;
 		.saida(saida)
 	);
 
+
   
+// ================== TASKS AUXILIARES ===================
+  
+  	task automatic resetar();
+    	begin
+          	$display("\n=============================== SISTEMA RESETADO ===============================\n");
+          
+          	rst = 1;
+          	repeat(5) @(posedge clk);
+          
+            rst = 0;
+          	repeat(5) @(posedge clk);	
+        end
+    endtask
+  
+  	task automatic pressionar_botao(int tempo);
+    	begin
+          	push_button = 1;
+          	repeat(tempo) @(posedge clk);
+         
+			push_button = 0;
+			repeat(10) @(posedge clk);          
+        end
+  	endtask
+
+	task automatic preparar_estado_inicial(bit led_alvo, bit saida_alvo);
+        begin
+			// Analisando modo
+			if (led != led_alvo) begin
+				infravermelho <= 0; // RETIRANDO BUG
+				repeat(5) @(posedge clk);
+				pressionar_botao(5305);
+			end
+
+			// Analisando lâmpada
+			if (saida != saida_alvo) begin
+
+              	if (led_alvo == 1)	// Manual
+                  	pressionar_botao(305);
+              
+				else begin 			// Automático
+                  if (saida_alvo == 1) begin	// Alvo: Aceso
+						infravermelho <= 1;
+						repeat(10) @(posedge clk);
+					end 
+					else begin					// Alvo: Desligado
+						infravermelho <= 0;
+						repeat(30005) @(posedge clk);
+					end
+				end
+			end
+		end
+	endtask
   
 // ============ INÍCIO DOS TESTES SOLICITADOS ============
 
 	// Transição do Modo Automático Desligado para Modo Manual
-  	task teste_automatico_desligado_para_manual_sucesso();
+  	task automatic teste_automatico_desligado_para_manual_sucesso();
 		begin
-          	$display("\n-------------------------------------------------------------------------------");
+          	$display("----------------------------- INÍCIO DO TESTE ---------------------------------");
           	$display("Modo automático desligado para manual desligado com pushbutton >= 5305 clk (5s)");
             $display("-------------------------------------------------------------------------------");
 
-
           	// INPUTS
-			rst = 1;
-          	infravermelho = 0;
-          	push_button = 0;
-			#5
+            preparar_estado_inicial(1'b0, 1'b0);	// Auto, Desl
+                      
+          	$display("Estado inicial - led (modo): %b | Saída (Lâmpada): %b\n", led, saida);
           
-          	rst = 0; 
-			@(posedge clk);
-			#1
-          
-			push_button = 1;
-          	repeat(5305) @(posedge clk);
-			#1
-         
-			push_button = 0;
-			repeat(10) @(posedge clk);
-			#1
+          	pressionar_botao(5305);
 
 			// OUTPUTS
-			$display("Tempo atual: %0t", $time);
 			$display("Saida esperada - led (modo): 1 | Saída (Lâmpada): 0");
 			$display("Saida recebida - led (modo): %b | Saída (Lâmpada): %b", led, saida);
 
@@ -68,34 +108,22 @@ module tb;
                	$error;
         	end
               
-          	$display("------------------------------- FIM TESTE -------------------------------------\n");
+          	$display("------------------------------- FIM TESTE -------------------------------------\n\n");
 		end
 	endtask
 
-    task teste_automatico_desligado_para_manual_falha();
+    task automatic teste_automatico_desligado_para_manual_falha();
 		begin
-          	$display("\n-------------------------------------------------------------------------------");
+          	$display("----------------------------- INÍCIO DO TESTE ---------------------------------");
           	$display("Modo automático desligado para manual desligado com pushbutton < 5300 clk (5s)");
             $display("-------------------------------------------------------------------------------");
 
-
-          	// INPUTS
-			rst = 1;
-          	infravermelho = 0;
-          	push_button = 0;
-			#5
+            // INPUTS
+            preparar_estado_inicial(1'b0, 1'b0);	// Auto, Desl
+                      
+          	$display("Estado inicial - led (modo): %b | Saída (Lâmpada): %b\n", led, saida);
           
-          	rst = 0; 
-			@(posedge clk);
-			#1
-          
-			push_button = 1;
-          	repeat(4999) @(posedge clk);
-			#1
-         
-			push_button = 0;
-			repeat(10) @(posedge clk);
-			#1
+          	pressionar_botao(4999);
 
 			// OUTPUTS
 			$display("Tempo atual: %0t", $time);
@@ -109,38 +137,26 @@ module tb;
                	$error;
         	end
           
-          	$display("------------------------------- FIM TESTE -------------------------------------\n");
+          	$display("------------------------------- FIM TESTE -------------------------------------\n\n");
 		end
 	endtask
 
 	// Transição do Modo Automático Ligado para Modo Manual
-    task teste_automatico_ligado_para_manual_sucesso();
+    task automatic teste_automatico_ligado_para_manual_sucesso();
 		begin
-          	$display("\n-------------------------------------------------------------------------------");
+          	$display("----------------------------- INÍCIO DO TESTE ---------------------------------");
           	$display("Modo automático ligado para manual desligado com pushbutton >= 5300 clk (5s)");
             $display("-------------------------------------------------------------------------------");
 
 
           	// INPUTS
-			rst = 1;
-          	infravermelho = 1;
-          	push_button = 0;
-			#5
+          	preparar_estado_inicial(1'b0, 1'b1);	// Auto, Lig
+                      
+          	$display("Estado inicial - led (modo): %b | Saída (Lâmpada): %b\n", led, saida);
           
-          	rst = 0; 
-			@(posedge clk);
-			#1
-          
-			push_button = 1;
-          	repeat(5305) @(posedge clk);
-			#1
-         
-			push_button = 0;
-			repeat(10) @(posedge clk);
-			#1
+          	pressionar_botao(5305);
 
 			// OUTPUTS
-			$display("Tempo atual: %0t", $time);
           	$display("Saida esperada - led (modo): 1 | Saída (Lâmpada): 0");
 			$display("Saida recebida - led (modo): %b | Saída (Lâmpada): %b", led, saida);
 
@@ -151,34 +167,23 @@ module tb;
                	$error;
         	end
           
-          	$display("------------------------------- FIM TESTE -------------------------------------\n");
+          	$display("------------------------------- FIM TESTE -------------------------------------\n\n");
 		end
 	endtask
   
-    task teste_automatico_ligado_para_manual_falha();
+    task automatic teste_automatico_ligado_para_manual_falha();
 		begin
-          	$display("\n-------------------------------------------------------------------------------");
+          	$display("----------------------------- INÍCIO DO TESTE ---------------------------------");
           	$display("Modo automático ligado para manual desligado com pushbutton < 5300 clk (5s)");
             $display("-------------------------------------------------------------------------------");
 
 
           	// INPUTS
-			rst = 1;
-          	infravermelho = 1;
-          	push_button = 0;
-			#5
+            preparar_estado_inicial(1'b0, 1'b1);	// Auto, Lig
+                      
+          	$display("Estado inicial - led (modo): %b | Saída (Lâmpada): %b\n", led, saida);
           
-          	rst = 0; 
-			@(posedge clk);
-			#1
-          
-			push_button = 1;
-          	repeat(4999) @(posedge clk);
-			#1
-         
-			push_button = 0;
-			repeat(10) @(posedge clk);
-			#1
+          	pressionar_botao(4999);
 
 			// OUTPUTS
 			$display("Tempo atual: %0t", $time);
@@ -192,48 +197,25 @@ module tb;
                	$error;
         	end
           
-          	$display("------------------------------- FIM TESTE -------------------------------------\n");
+          	$display("------------------------------- FIM TESTE -------------------------------------\n\n");
 		end
 	endtask
   
   
   
   	// Transição do Modo Manual Desligado para Modo Automático
-    task teste_manual_desligado_para_automatico_sucesso();
+    task automatic teste_manual_desligado_para_automatico_sucesso();
 		begin
-          	$display("\n-------------------------------------------------------------------------------");
+          	$display("----------------------------- INÍCIO DO TESTE ---------------------------------");
             $display("Modo Manual Desligado para Automatico Ligado com pushbutton >= 5300 clk (5s)");
             $display("-------------------------------------------------------------------------------");
 
-
-          	// INPUTS
-			rst = 1;
-          	infravermelho = 0;
-          	push_button = 0;
-			#5
-              
-          	rst = 0; 
-			@(posedge clk);
-            #1
-              
-			push_button = 1;
-            repeat(5305) @(posedge clk);
-			#1
-            push_button = 0;
-			repeat(10) @(posedge clk);
-			#1
+            // INPUTS
+          	preparar_estado_inicial(1'b1, 1'b0);	// Man, Desl
           
-          	infravermelho = 1;
-          	repeat(10) @(posedge clk);
-          	#1
-              
-			push_button = 1;
-            repeat(5305) @(posedge clk);
-			#1
-         
-			push_button = 0;
-            repeat(10) @(posedge clk);
-			#1
+            $display("Estado inicial - led (modo): %b | Saída (Lâmpada): %b\n", led, saida);
+
+            pressionar_botao(5305);
 
 			// OUTPUTS
 			$display("Tempo atual: %0t", $time);
@@ -247,46 +229,23 @@ module tb;
                	$error;
         	end
           
-          	$display("------------------------------- FIM TESTE -------------------------------------\n");
+          	$display("------------------------------- FIM TESTE -------------------------------------\n\n");
 		end
 	endtask
 
 
-  task teste_manual_desligado_para_automatico_falha();
+  task automatic teste_manual_desligado_para_automatico_falha();
 		begin
-          	$display("\n-------------------------------------------------------------------------------");
+          	$display("----------------------------- INÍCIO DO TESTE ---------------------------------");
           	$display("Manual Desligado para Automatico Ligado com pushbutton < 5300 clk (5s)");
             $display("-------------------------------------------------------------------------------");
-
-
+            
           	// INPUTS
-			rst = 1;
-          	infravermelho = 0;
-          	push_button = 0;
-			#5
-              
-          	rst = 0; 
-			@(posedge clk);
-            #1
-              
-			push_button = 1;
-            repeat(5305) @(posedge clk);
-			#1
-            push_button = 0;
-			repeat(10) @(posedge clk);
-			#1
+            preparar_estado_inicial(1'b1, 1'b0);	// Man, Desl
           
-            infravermelho = 1;
-          	repeat(10) @(posedge clk);
-          	#1
-              
-			push_button = 1;
-          	repeat(4999) @(posedge clk);
-			#1
-         
-			push_button = 0;
-            repeat(10) @(posedge clk);
-			#1
+            $display("Estado inicial - led (modo): %b | Saída (Lâmpada): %b\n", led, saida);
+
+            pressionar_botao(4999);
 
 			// OUTPUTS
 			$display("Tempo atual: %0t", $time);
@@ -300,48 +259,23 @@ module tb;
                	$error;
         	end
           
-          	$display("------------------------------- FIM TESTE -------------------------------------\n");
+          	$display("------------------------------- FIM TESTE -------------------------------------\n\n");
 		end
 	endtask
   
   	// Transição do Modo Manual Ligado para Modo Automático
-   	task teste_manual_ligado_para_automatico_sucesso();
+   	task automatic teste_manual_ligado_para_automatico_sucesso();
 		begin
-          	$display("\n-------------------------------------------------------------------------------");
+          	$display("----------------------------- INÍCIO DO TESTE ---------------------------------");
             $display("Modo Manual Ligado para Automatico Ligado com pushbutton >= 5300 clk (5s)");
             $display("-------------------------------------------------------------------------------");
 
-
-          	// INPUTS
-			rst = 1;
-          	infravermelho = 1;
-          	push_button = 0;
-			#5
+            // INPUTS
+          	preparar_estado_inicial(1'b1, 1'b1);	// Man, Lig
           
-          	rst = 0; 
-			@(posedge clk);
-			#1
+            $display("Estado inicial - led (modo): %b | Saída (Lâmpada): %b\n", led, saida);
           
-			push_button = 1;
-          	repeat(5305) @(posedge clk);
-			#1
-			push_button = 0;
-			repeat(10) @(posedge clk);
-			#1
-          
-			push_button = 1;
-          	repeat(305) @(posedge clk);
-			#1
-			push_button = 0;
-            repeat(10) @(posedge clk);
-			#1
-          
-			push_button = 1;
-          	repeat(5305) @(posedge clk);
-			#1
-			push_button = 0;
-			repeat(10) @(posedge clk);
-			#1
+            pressionar_botao(5305);
           
 			// OUTPUTS
 			$display("Tempo atual: %0t", $time);
@@ -355,51 +289,22 @@ module tb;
                	$error;
         	end
           
-          	$display("------------------------------- FIM TESTE -------------------------------------\n");
+          	$display("------------------------------- FIM TESTE -------------------------------------\n\n");
 		end
 	endtask
   
-    task teste_manual_ligado_para_automatico_falha();
+    task automatic teste_manual_ligado_para_automatico_falha();
 		begin
-          	$display("\n-------------------------------------------------------------------------------");
+          	$display("----------------------------- INÍCIO DO TESTE ---------------------------------");
             $display("Modo Manual Ligado para Automatico Ligado com pushbutton < 5300 clk (5s)");
             $display("-------------------------------------------------------------------------------");
 
-
-          	// INPUTS
-			rst = 1;
-          	infravermelho = 0;
-          	push_button = 0;
-			#5
+            // INPUTS
+            preparar_estado_inicial(1'b1, 1'b1);	// Man, Lig
           
-          	rst = 0; 
-			@(posedge clk);
-			#1
+            $display("Estado inicial - led (modo): %b | Saída (Lâmpada): %b\n", led, saida);
           
-			push_button = 1;
-          	repeat(5305) @(posedge clk);
-			#1
-			push_button = 0;
-			repeat(10) @(posedge clk);
-			#1
-          
-            infravermelho = 1;
-          	repeat(10) @(posedge clk);
-          	#1
-          
-			push_button = 1;
-          	repeat(305) @(posedge clk);
-			#1
-			push_button = 0;
-            repeat(10) @(posedge clk);
-			#1
-          
-			push_button = 1;
-            repeat(4999) @(posedge clk);
-			#1
-			push_button = 0;
-			repeat(10) @(posedge clk);
-			#1
+          	pressionar_botao(4999);
           
 			// OUTPUTS
 			$display("Tempo atual: %0t", $time);
@@ -413,31 +318,41 @@ module tb;
                	$error;
         	end
           
-          	$display("------------------------------- FIM TESTE -------------------------------------\n");
+          	$display("------------------------------- FIM TESTE -------------------------------------\n\n");
 		end
 	endtask
 
   
-// ============ EXECUÇÃO E ANÁLISE DOS TESTES ============
+	// ============ EXECUÇÃO DOS TESTES ============
 	initial begin
 		clk = 0;
+		repeat(15) @(posedge clk); 
 
-      	teste_automatico_desligado_para_manual_sucesso();
-      	teste_automatico_desligado_para_manual_falha();
-      	teste_automatico_ligado_para_manual_sucesso();		// Não passou
-      	teste_automatico_ligado_para_manual_falha();
-      
-      	teste_manual_desligado_para_automatico_sucesso();
-      	teste_manual_desligado_para_automatico_falha();		// Não passou
-      	teste_manual_ligado_para_automatico_sucesso();
-        teste_manual_ligado_para_automatico_falha();		// Não passou
+		teste_automatico_desligado_para_manual_sucesso();
+		teste_automatico_desligado_para_manual_falha();
+		teste_automatico_ligado_para_manual_sucesso();      // Não passou (Bug do Infra)
+		teste_automatico_ligado_para_manual_falha();
 
-		#100 $finish;
+		teste_manual_desligado_para_automatico_sucesso();
+		teste_manual_desligado_para_automatico_falha();
+		teste_manual_ligado_para_automatico_sucesso();
+		teste_manual_ligado_para_automatico_falha();
+
+		repeat(100) @(posedge clk); 
+    
+		$finish;
 	end
+
+	// ============ BLOCO DE RESETS ALEATÓRIOS ============
   
-// ============ RESUMO DOS PROBLEMAS ENCONTRADOS ============
-// Transição do Automático Desligado para o Manual Desligado 	de forma correta (5s)
-// Transição do Manual Desligado para o Automático Ligado 		de forma incorreta (<5s)
-// Transição do Manual Ligado para o Automático Ligado 			de forma incorreta (<5s)
+  	initial begin
+    	resetar();	// Reset inicial do sistema
+
+      	repeat(30000) @(posedge clk);	// DEVE SER ALEATÓRIO!
+    	resetar();
+  	end
   
+	// ============ RESUMO DOS PROBLEMAS ENCONTRADOS ============
+	// Transição do Automático Desligado para o Manual Desligado 	de forma correta (5s)
+
 endmodule
