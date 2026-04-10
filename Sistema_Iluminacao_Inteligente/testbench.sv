@@ -1,5 +1,3 @@
-// ---------- TASKS DE TESTES SENDO CHAMADAS AO FIM DO MÓDULO ----------
-
 // ============ MODELO INICIAL DADO PELO PROFESSOR ============
 
 `timescale 1ns/1ps
@@ -28,6 +26,67 @@ module tb;
 
 
   
+// ================== FUNÇÕES AUXILIARES ===================
+  
+	function automatic logic [1:0] estado_atual();
+      	return {led, saida};
+	endfunction
+
+  	function automatic logic [1:0] prever_botao(int tempo_pressionamento);
+			
+      	logic led_atual, saida_atual;
+      	{led_atual, saida_atual} = estado_atual();
+   	
+      	// Tempo inválido (<300)
+		if (tempo_pressionamento < 300)
+          return {led_atual, saida_atual};	// Mantém o estado
+      
+      	// Tempo de pressionamento longo (>=5300)
+      	if (tempo_pressionamento >= 5300) begin
+      
+          	if (led_atual == 1'b0)		// Automático (0) para:
+              	return {1'b1, 1'b0};	// Manual (1) desligado (0)
+          
+          	else						// Manual (1) para:
+              	return {1'b0, 1'b1};	// Automático (0) ligado (1)
+      	end
+
+      // Tempo de pressionamento curto (>=300 e <5300)
+      	else begin
+          	if (led_atual == 1'b1) 					// Se no modo Manual (1)
+              	return {led_atual, ~saida_atual}; 	// Inverte a Lâmpada
+          
+          	else									// Se no modo Automático (0)
+              	return {led_atual, saida_atual};  	// Ignora o botão
+        end
+      
+	endfunction
+  
+  	function automatic logic [1:0] prever_infra(int infra_ativo, int infra_tempo);
+		
+      	logic led_atual, saida_atual;
+      	{led_atual, saida_atual} = estado_atual();
+
+      	// Modo Automático (0)
+    	if (led_atual == 1'b0)
+          	if (infra_ativo == 1) 		// Se Infra ativar (1)
+              	return {1'b0, 1'b1}; 	// Automático (0) ligado (1)
+      
+      		else begin						// Se Infra desativar (0)
+              	if (infra_tempo >= 30000)	// Durante 30s
+                  	return {1'b0, 1'b0}; 	// Automático (0) desligado (0)
+              
+				else							// Menos de 30s
+                  return {1'b0, saida_atual}; 	// Automático (0) e mantém Lâmpada
+			end
+      
+      	// Modo Manual (1)
+      	return {led_atual, saida_atual};	// Infra não causa efeito
+      
+	endfunction
+  
+  
+  
 // ================== TASKS AUXILIARES ===================
   
   	task automatic resetar();
@@ -41,254 +100,61 @@ module tb;
           	repeat(5) @(posedge clk);	
         end
     endtask
-  
-  	task automatic pressionar_botao(int tempo);
-    	begin
-          	push_button = 1;
-          	repeat(tempo) @(posedge clk);
-         
-			push_button = 0;
-			repeat(10) @(posedge clk);          
-        end
-  	endtask
-
-	task automatic preparar_estado_inicial(bit led_alvo, bit saida_alvo);
-        begin
-			// Analisando modo
-			if (led != led_alvo) begin
-				infravermelho <= 0; // RETIRANDO BUG
-				repeat(5) @(posedge clk);
-				pressionar_botao(5305);
-			end
-
-			// Analisando lâmpada
-			if (saida != saida_alvo) begin
-
-              	if (led_alvo == 1)	// Manual
-                  	pressionar_botao(305);
-              
-				else begin 			// Automático
-                  if (saida_alvo == 1) begin	// Alvo: Aceso
-						infravermelho <= 1;
-						repeat(10) @(posedge clk);
-					end 
-					else begin					// Alvo: Desligado
-						infravermelho <= 0;
-						repeat(30005) @(posedge clk);
-					end
-				end
-			end
-		end
-	endtask
-  
-  
-  
-// ============ INÍCIO DOS TESTES SOLICITADOS ============
-
-  	task automatic teste_automatico_desligado_para_manual_desligado(int tempo_botao);
-		begin
-          	$display("----------------------------- INÍCIO DO TESTE ---------------------------------");
-          	$display("Modo automático desligado para manual desligado com pushbutton >= 5305 clk (5s)");
-            $display("-------------------------------------------------------------------------------");
-
-          	// INPUTS
-            preparar_estado_inicial(1'b0, 1'b0);	// Auto, Desl
-                      
-          	$display("Estado inicial - led (modo): %b | Saída (Lâmpada): %b", led, saida);
-          	$display("Tempo de pressionamento do botão: %0d\n", tempo_botao);
-          
-          	pressionar_botao(tempo_botao);
-			
-          	// Tempo de pressionamento Superado
-          	if (tempo_botao >= 5300) begin
-				$display("Saida esperada - led (modo): 1 | Saída (Lâmpada): 0");
-				$display("Saida recebida - led (modo): %b | Saída (Lâmpada): %b", led, saida);
-              
-            	if (led == 1'b1 && saida == 1'b0) $display("Resultado: PASSOU");
-            	else begin
-                  	$display("Resultado: FALHOU");
-                  	$error;
-                end
-        	end
-          
-          	// Tempo de pressionamento Não superado
-          	else begin
-              	$display("Saida esperada - led (modo): 0 | Saída (Lâmpada): 0");
-				$display("Saida recebida - led (modo): %b | Saída (Lâmpada): %b", led, saida);
-              
-            	if (led == 1'b0 && saida == 1'b0) $display("Resultado: PASSOU");
-            	else begin
-                  	$display("Resultado: FALHOU");
-                  	$error;
-                end
-        	end
-              
-          	$display("------------------------------- FIM TESTE -------------------------------------\n\n");
-		end
-	endtask
-
-
-  	task automatic teste_automatico_ligado_para_manual_desligado(int tempo_botao);
-		begin
-          	$display("----------------------------- INÍCIO DO TESTE ---------------------------------");
-          	$display("Modo automático ligado para manual desligado com pushbutton >= 5300 clk (5s)");
-            $display("-------------------------------------------------------------------------------");
-
-
-          	// INPUTS
-          	preparar_estado_inicial(1'b0, 1'b1);	// Auto, Lig
-                      
-          	$display("Estado inicial - led (modo): %b | Saída (Lâmpada): %b", led, saida);
-            $display("Tempo de pressionamento do botão: %0d\n", tempo_botao);
-          
-          	pressionar_botao(tempo_botao);
-
-          	// Tempo de pressionamento Superado
-          	if (tempo_botao >= 5300) begin
-				$display("Saida esperada - led (modo): 1 | Saída (Lâmpada): 0");
-				$display("Saida recebida - led (modo): %b | Saída (Lâmpada): %b", led, saida);
-              
-            	if (led == 1'b1 && saida == 1'b0) $display("Resultado: PASSOU");
-            	else begin
-                  	$display("Resultado: FALHOU");
-                  	$error;
-                end
-        	end
-          
-          	// Tempo de pressionamento Não superado
-          	else begin
-              	$display("Saida esperada - led (modo): 0 | Saída (Lâmpada): 1");
-				$display("Saida recebida - led (modo): %b | Saída (Lâmpada): %b", led, saida);
-              
-              	if (led == 1'b0 && saida == 1'b1) $display("Resultado: PASSOU");
-            	else begin
-                  	$display("Resultado: FALHOU");
-                  	$error;
-                end
-        	end
-          
-          	$display("------------------------------- FIM TESTE -------------------------------------\n\n");
-		end
-	endtask
-  
-  
-  task automatic teste_manual_desligado_para_automatico_ligado(int tempo_botao);
-		begin
-          	$display("----------------------------- INÍCIO DO TESTE ---------------------------------");
-            $display("Modo Manual Desligado para Automatico Ligado com pushbutton >= 5300 clk (5s)");
-            $display("-------------------------------------------------------------------------------");
-
-            // INPUTS
-          	preparar_estado_inicial(1'b1, 1'b0);	// Man, Desl
-          
-            $display("Estado inicial - led (modo): %b | Saída (Lâmpada): %b", led, saida);
-          	$display("Tempo de pressionamento do botão: %0d\n", tempo_botao);
-
-            pressionar_botao(tempo_botao);
-
-          	// Tempo de pressionamento Superado
-          	if (tempo_botao >= 5300) begin
-              	$display("Saida esperada - led (modo): 0 | Saída (Lâmpada): 1");
-				$display("Saida recebida - led (modo): %b | Saída (Lâmpada): %b", led, saida);
-              
-              	if (led == 1'b0 && saida == 1'b1) $display("Resultado: PASSOU");
-            	else begin
-                  	$display("Resultado: FALHOU");
-                  	$error;
-                end
-        	end
-          
-          	// Tempo de pressionamento Não superado
-          	else begin
-              	$display("Saida esperada - led (modo): 0 | Saída (Lâmpada): 0");
-				$display("Saida recebida - led (modo): %b | Saída (Lâmpada): %b", led, saida);
-              
-              	if (led == 1'b0 && saida == 1'b0) $display("Resultado: PASSOU");
-            	else begin
-                  	$display("Resultado: FALHOU");
-                  	$error;
-                end
-        	end
-          
-          	$display("------------------------------- FIM TESTE -------------------------------------\n\n");
-		end
-	endtask
 
   
-  	task automatic teste_manual_ligado_para_automatico_ligado(int tempo_botao);
-		begin
-          	$display("----------------------------- INÍCIO DO TESTE ---------------------------------");
-            $display("Modo Manual Ligado para Automatico Ligado com pushbutton >= 5300 clk (5s)");
-            $display("-------------------------------------------------------------------------------");
-
-            // INPUTS
-          	preparar_estado_inicial(1'b1, 1'b1);	// Man, Lig
-          
-            $display("Estado inicial - led (modo): %b | Saída (Lâmpada): %b", led, saida);
-          	$display("Tempo de pressionamento do botão: %0d\n", tempo_botao);
-          
-          	pressionar_botao(tempo_botao);
-          
-          	// Tempo de pressionamento Superado
-          	if (tempo_botao >= 5300) begin
-              	$display("Saida esperada - led (modo): 0 | Saída (Lâmpada): 1");
-				$display("Saida recebida - led (modo): %b | Saída (Lâmpada): %b", led, saida);
-              
-              	if (led == 1'b0 && saida == 1'b1) $display("Resultado: PASSOU");
-            	else begin
-                  	$display("Resultado: FALHOU");
-                  	$error;
-                end
-        	end
-          
-          	// Tempo de pressionamento Não superado
-          	else begin
-              	$display("Saida esperada - led (modo): 0 | Saída (Lâmpada): 1");
-				$display("Saida recebida - led (modo): %b | Saída (Lâmpada): %b", led, saida);
-              
-              	if (led == 1'b0 && saida == 1'b1) $display("Resultado: PASSOU");
-            	else begin
-                  	$display("Resultado: FALHOU");
-                  	$error;
-                end
-        	end
-          
-          	$display("------------------------------- FIM TESTE -------------------------------------\n\n");
-		end
-	endtask
-
   
-	// ============ EXECUÇÃO DOS TESTES ============
+  	// ============ SENSOR INFRAVERMELHO E PUSH_BUTTON ALEATÓRIO ============
   
-  	int tempo_pressionamento_sorteado;
+  	int tempo_infra;
   
 	initial begin
-		clk = 0;
-		repeat(15) @(posedge clk); 
-      
-      	tempo_pressionamento_sorteado = $urandom_range(310, 10350);
+      	while(!fim_teste) begin
+          
+      		// Tempo em nível lógico alto
+      		tempo_infra = $urandom_range(30, 1000);
+			infravermelho = 1;
+			repeat(tempo_infra) @(posedge clk);
 
-		teste_automatico_desligado_para_manual_desligado(tempo_pressionamento_sorteado);
-		teste_automatico_ligado_para_manual_desligado(tempo_pressionamento_sorteado);      // Não passou (Bug do Infra)
-
-      	teste_manual_desligado_para_automatico_ligado(tempo_pressionamento_sorteado);
-      	teste_manual_ligado_para_automatico_ligado(tempo_pressionamento_sorteado);
-
-		repeat(100) @(posedge clk); 
-    
-		$finish;
-	end
-
-	// ============ BLOCO DE RESETS ALEATÓRIOS ============
-  
-  	initial begin
-    	resetar();	// Reset inicial do sistema
-
-      	repeat(30000) @(posedge clk);	// DEVE SER ALEATÓRIO!
-    	resetar();
+      		// Tempo em nível lógico baixo
+      		tempo_infra = $urandom_range(1, 120000);
+			infravermelho = 0;
+			repeat(tempo_infra) @(posedge clk);	
+          
+        end
   	end
   
-	// ============ RESUMO DOS PROBLEMAS ENCONTRADOS ============
-	// Transição do Automático Desligado para o Manual Desligado 	de forma correta (5s)
+  
+  	int tempo_botao;
+  
+	initial begin
+      	while(!fim_teste) begin
+          
+      		// Tempo em nível lógico alto
+      		tempo_botao = $urandom_range(310, 10350);
+			push_button = 1;
+			repeat(tempo_botao) @(posedge clk);
 
+      		// Tempo em nível lógico baixo
+      		tempo_botao = $urandom_range(500, 2000);
+			push_button = 0;
+      		repeat(tempo_botao) @(posedge clk);	
+        
+        end
+  	end
+
+
+  
+// ============ EXECUÇÃO DOS TESTES ============
+    
+ int cobertura_atingida = 0;
+	int fim_teste = 0;
+  
+	initial begin
+			resetar();
+			
+  			// CÓDIGO DE MONITORAMENTO
+  
+      	$finish;
+	end
+  
 endmodule
