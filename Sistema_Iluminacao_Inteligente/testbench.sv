@@ -9,6 +9,7 @@ module tb;
 	logic led, saida;
 
 	always #1 clk = ~clk;  // clock de 2ns período (500 MHz)
+  	initial clk = 0;	   // Trecho faltante  
 
 	// DUT
 	controladora #(
@@ -32,61 +33,50 @@ module tb;
       	return {led, saida};
 	endfunction
 
-  	function automatic logic [1:0] prever_botao(int tempo_pressionamento);
-			
-      	logic led_atual, saida_atual;
-      	{led_atual, saida_atual} = estado_atual();
-   	
-      	// Tempo inválido (<300)
+	function automatic logic [1:0] prever_botao(int tempo_pressionamento, logic led_ini, logic saida_ini);
+		// Tempo inválido (<300)
 		if (tempo_pressionamento < 300)
-          return {led_atual, saida_atual};	// Mantém o estado
-      
-      	// Tempo de pressionamento longo (>=5300)
-      	if (tempo_pressionamento >= 5300) begin
-      
-          	if (led_atual == 1'b0)		// Automático (0) para:
-              	return {1'b1, 1'b0};	// Manual (1) desligado (0)
-          
-          	else						// Manual (1) para:
-              	return {1'b0, 1'b1};	// Automático (0) ligado (1)
-      	end
+			return {led_ini, saida_ini};	// Mantém o estado
 
-      // Tempo de pressionamento curto (>=300 e <5300)
-      	else begin
-          	if (led_atual == 1'b1) 					// Se no modo Manual (1)
-              	return {led_atual, ~saida_atual}; 	// Inverte a Lâmpada
-          
-          	else									// Se no modo Automático (0)
-              	return {led_atual, saida_atual};  	// Ignora o botão
-        end
-      
+		// Tempo de pressionamento longo (>=5300)
+		if (tempo_pressionamento >= 5300) begin
+			if (led_ini == 1'b0)		// Automático (0) para:
+				return {1'b1, 1'b0};	// Manual (1) desligado (0)
+			else						// Manual (1) para:
+				return {1'b0, 1'b1};	// Automático (0) ligado (1)
+		end
+
+		// Tempo de pressionamento curto (>=300 e <5300)
+		else begin
+			if (led_ini == 1'b1) 					// Se no modo Manual (1)
+				return {led_ini, ~saida_ini}; 		// Inverte a Lâmpada
+			else									// Se no modo Automático (0)
+				return {led_ini, saida_ini};  		// Ignora o botão
+		end
 	endfunction
-  
-  	function automatic logic [1:0] prever_infra(int infra_ativo, int infra_tempo);
-		
-      	logic led_atual, saida_atual;
-      	{led_atual, saida_atual} = estado_atual();
 
-      	// Modo Automático (0)
-    	if (led_atual == 1'b0)
-          	if (infra_ativo == 1) 		// Se Infra ativar (1)
-              	return {1'b0, 1'b1}; 	// Automático (0) ligado (1)
-      
-      		else begin						// Se Infra desativar (0)
-              	if (infra_tempo >= 30000)	// Durante 30s
-                  	return {1'b0, 1'b0}; 	// Automático (0) desligado (0)
-              
+	function automatic logic [1:0] prever_infra(int infra_ativo, int infra_tempo, logic led_ini, logic saida_ini);
+
+		// Modo Automático (0)
+		if (led_ini == 1'b0) begin
+			if (infra_ativo == 1) 			// Se Infra ativar (1)
+				return {1'b0, 1'b1}; 		// Automático (0) ligado (1)
+
+			else begin						// Se Infra desativar (0)
+				if (infra_tempo >= 30000)		// Durante 30s
+					return {1'b0, 1'b0}; 		// Automático (0) desligado (0)
 				else							// Menos de 30s
-                  return {1'b0, saida_atual}; 	// Automático (0) e mantém Lâmpada
+					return {1'b0, saida_ini}; 	// Automático (0) e mantém Lâmpada
 			end
-      
-      	// Modo Manual (1)
-      	return {led_atual, saida_atual};	// Infra não causa efeito
-      
+		end
+
+		// Modo Manual (1)
+		return {led_ini, saida_ini};	// Infra não causa efeito
+
 	endfunction
-  
-  
-  
+
+
+
 // ================== TASKS AUXILIARES ===================
   
   	task automatic resetar();
@@ -104,6 +94,8 @@ module tb;
   
   
   	// ============ SENSOR INFRAVERMELHO E PUSH_BUTTON ALEATÓRIO ============
+  
+  	int fim_teste = 0;
   
   	int tempo_infra;
   
