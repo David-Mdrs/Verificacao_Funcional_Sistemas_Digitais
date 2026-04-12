@@ -28,10 +28,6 @@ module tb;
 
   
 // ================== FUNÇÕES AUXILIARES ===================
-  
-	function automatic logic [1:0] estado_atual();
-      	return {led, saida};
-	endfunction
 
 	function automatic logic [1:0] prever_botao(int tempo_pressionamento, logic led_ini, logic saida_ini);
 		// Tempo inválido (<300)
@@ -93,7 +89,7 @@ module tb;
 
   
   
-  	// ============ SENSOR INFRAVERMELHO E PUSH_BUTTON ALEATÓRIO ============
+  	// ============ GERADOR DE SINAIS DO INFRAVERMELHO E BOTÃO ALEATORIAMENTE ============
   
   	int fim_teste = 0;
   
@@ -136,17 +132,93 @@ module tb;
 
 
   
-// ============ EXECUÇÃO DOS TESTES ============
+	// ======================== EXECUÇÃO DOS MONITORAMENTOS E TESTES ========================
     
- int cobertura_atingida = 0;
-	int fim_teste = 0;
+	int cobertura_atingida = 0;  
+  
+  	// MONITORADOR DE SINAIS DO BOTÃO
+	initial begin
+      
+      	logic led_ini, saida_ini;	// Visualizar estado inicial do sistema
+		logic led_esp, saida_esp;	// Gabarito para saber estado esperado
+		int contador_btn;
+		
+      	// Espera a task resetar() terminar
+		repeat(15) @(posedge clk); 
+
+		while (!fim_teste) begin
+			@(posedge push_button);
+			
+			// Atualizando estado inicial do sistema
+			led_ini = led;
+			saida_ini = saida;
+			
+			contador_btn = 0;
+
+			// Conta os clocks enquanto o botão estiver pressionado
+			while (push_button == 1'b1) begin
+				@(posedge clk);
+				contador_btn++;
+			end
+			
+          	// Localizar estado esperado com base no "tempo do botão" e "estado atual"
+          	{led_esp, saida_esp} = prever_botao(contador_btn, led_ini, saida_ini);
+			repeat(5) @(posedge clk);
+
+			// Monitoramento de estados
+			if (contador_btn >= 300) begin
+				$display("\n-------------------------------------------------------------------------------");
+				if (contador_btn >= 5300)
+					$display("EVENTO: Pushbutton pressionado por tempo LONGO (%0d ciclos)", contador_btn);
+				else
+					$display("EVENTO: Pushbutton pressionado por tempo CURTO (%0d ciclos)", contador_btn);
+				$display("-------------------------------------------------------------------------------");
+				
+				$display("Tempo atual: %0t", $time);
+              	$display("Estado inicial - led: %s | Saída: %s | Infra: %b",
+                        (led_ini ? "Manual" : "Automático"), (saida_ini ? "Desligado" : "Ligado"), infravermelho);
+              
+              	$display("Saida esperada - led: %s | Saída: %s | Infra: %b",
+                        (led_esp ? "Manual" : "Automático"), (saida_esp ? "Desligado" : "Ligado"), infravermelho);
+              
+              	$display("Saida recebida - led: %s | Saída: %s | Infra: %b",
+                       	(led ? "Manual" : "Automático"), (saida ? "Desligado" : "Ligado"), infravermelho);
+
+				// Após o sinal do botão
+              	if ({led, saida} === {led_esp, saida_esp}) begin	// Restultado igual o esperado
+                  	$display("Resultado do teste: PASSOU");			// Passou!
+				end else begin										// Restultado diferente do esperado
+                  	$display("Resultado do teste: FALHOU\n");		// Falha!
+                  	$fatal();
+				end
+				$display("------------------------------- FIM TESTE -------------------------------------\n");
+			end
+		end
+	end
+  
+  
+    // MONITORADOR DE SINAIS DO SENSOR INFRAVERMELHO
+  
+  	initial begin
+      	// ----- CÓDIGO DE MONITORAMENTO AQUI -----
+    end
+
+  
   
 	initial begin
-			resetar();
-			
-  			// CÓDIGO DE MONITORAMENTO
-  
-      	$finish;
+		// Inicializando sistema da placa
+		resetar();
+		
+      	// LEMBRAR DE MUDAR PARA (cobertura_atingida == 4) PARA FINALIZAR TESTE
+		repeat(1000000) @(posedge clk);
+		
+		// Teste de cobertura concluído
+		fim_teste = 1;
+		
+		$display("\n===============================================================");
+		$display("            SIMULAÇÃO FINALIZADA COM SUCESSO!                  ");
+		$display("===============================================================\n");
+		$finish;
 	end
   
 endmodule
