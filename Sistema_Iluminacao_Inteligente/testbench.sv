@@ -368,4 +368,10 @@ module tb;
 		$finish;
 	end
   
+	// BLOCO PARA GERAÇÃO DE ONDAS DO GTKWAVE
+    initial begin
+        $dumpfile("simulacao.vcd"); // Nome do arquivo que será gerado
+        $dumpvars(0, tb);           // Pega todas as variáveis dentro do módulo 'tb'
+    end
+
 endmodule

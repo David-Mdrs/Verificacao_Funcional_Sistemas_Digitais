@@ -17,18 +17,22 @@ Este projeto consiste na implementação e verificação funcional de um **Siste
 
 Para rodar a simulação no seu terminal (PowerShell ou CMD), siga os passos abaixo:
 
-### 1. Compilação
-O Icarus Verilog exige a flag `-g2012` para habilitar os recursos modernos do SystemVerilog utilizados neste projeto.
-
+### 1. Compilar
+Gera o executável da simulação ativando os recursos do SystemVerilog:
 ```powershell
 iverilog -g2012 -o simulacao.vvp design.sv testbench.sv
 ```
 
-### 2. Execução da Simulação
+### 2. Simular
+Roda os testes automatizados, exibe os logs no terminal e gera o arquivo de ondas (simulacao.vcd):
 
-Após a compilação bem-sucedida (que gera o arquivo compilado `simulacao.vvp` na sua pasta), o próximo passo é rodar a simulação de fato. 
-
-Para iniciar o teste, execute o comando abaixo:
-
-```powershell
+```PowerShell
 vvp simulacao.vvp
+```
+
+### 3. Visualizar (GTKWave)
+Abre o visualizador para análise gráfica do circuito no tempo:
+
+```PowerShell
+gtkwave simulacao.vcd
+```
