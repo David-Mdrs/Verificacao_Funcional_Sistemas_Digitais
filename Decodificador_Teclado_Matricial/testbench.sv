@@ -252,6 +252,35 @@ module tb;
             end
         end
   	endtask
+  
+  	// GERADOR RELEASE 03
+  	task automatic gerador_release_03();
+        begin
+            repeat(50) begin
+              
+                tecla_aleatoria = $urandom_range(0, 9);
+                active_lin = KEY_LIN[tecla_aleatoria[3:0]];
+                active_col = KEY_COL[tecla_aleatoria[3:0]];
+
+                // Oscilações no botão
+                repeat(100) begin
+                    key_pressed = $urandom_range(0, 1);
+                    @(posedge clk);
+                end
+
+                // Estabilizando botão
+                key_pressed = 1;
+                repeat(DEBOUNCE + 100) @(posedge clk);
+
+                // Fim do pressionamento
+                key_pressed = 0;
+                soltar_tecla();
+
+                // Intervalo aleatório entre teclas
+                repeat($urandom_range(10, 100)) @(posedge clk);
+            end
+        end
+    endtask
 
 	// ======================= MONITORAMENTO =======================
 
@@ -393,6 +422,60 @@ module tb;
             end
         end
     endtask
+  
+  
+  	// MONITORAMENTO RELEASE 03
+    task automatic monitor_release_03();
+        logic [3:0] tecla_esperada;
+        logic [3:0] tecla_lida;
+        bit tecla_estavel;
+        begin
+            quantidade_testes = 0;
+
+            repeat(30) @(posedge clk);
+
+            while (quantidade_testes < 50) begin
+                @(posedge key_pressed);
+
+                tecla_estavel = 1;
+                repeat(DEBOUNCE + 10) begin
+                    @(posedge clk);
+                    if (!key_pressed) begin
+                        tecla_estavel = 0;
+                        break;
+                    end
+                end
+
+                if (!tecla_estavel)
+                    continue;
+
+                tecla_esperada = tecla_aleatoria[3:0];
+
+                repeat(5) @(posedge clk);
+
+                tecla_lida = digitos_value.digits[0];
+
+                $display("------------------ RELEASE 03 --------------------------");
+                $display("Teste #%0d", quantidade_testes + 1);
+                $display("Tecla esperada : 0x%0X", tecla_esperada);
+                $display("Tecla lida     : 0x%0X", tecla_lida);
+
+                if (tecla_lida === tecla_esperada) begin
+                    $display("RESULTADO: PASSOU");
+                end
+                else begin
+                    $display("RESULTADO: FALHOU");
+                    $fatal();
+                end
+
+                $display("--------------------------------------------------------\n");
+
+                quantidade_testes++;
+
+                wait (!key_pressed);
+            end
+        end
+    endtask
 
     // ============================ EXECUÇÃO DAS RELEASES ============================
 
@@ -447,13 +530,37 @@ module tb;
         end
     endtask
   
+  
+  	// RELEASE 03
+task automatic executar_release_03();
+        begin
+            $display("\n====================== RELEASE 03: DEBOUNCE (50 TESTES) ======================\n");
+            
+            quantidade_testes = 0; 
+            soltar_tecla();
+            repeat(50) @(posedge clk);
+
+            // Inicia o monitor e gerador
+            fork
+                gerador_release_03();
+                monitor_release_03();
+            join
+
+            $display("\n====================================================");
+            $display(" RELEASE 03 FINALIZADA COM SUCESSO ");
+            $display(" Todos os 50 testes de ruído mecânico passaram.");
+            $display("====================================================\n");
+        end
+    endtask
+  
     task automatic executar_todas_releases();
         begin
             executar_release_01();
           	executar_release_02();
+          	executar_release_03();
 
             // Quando for adicionar novas releases, siga este padrão:
-            // executar_release_03();
+            // executar_release_04();
         end
     endtask
 
@@ -470,7 +577,6 @@ module tb;
 
         $display("\n====================================================");
         $display(" TODAS AS RELEASES FINALIZADAS ");
-        $display(" Quantidade total de testes: %0d", quantidade_testes);
         $display("====================================================\n");
 
         $finish;
