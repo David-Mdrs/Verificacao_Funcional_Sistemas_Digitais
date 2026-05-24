@@ -34,6 +34,41 @@ module tb;
         .digitos_value (digitos_value),	// Output
         .digitos_valid (digitos_valid)	// Output
     );
+  
+  	// ============================ COVERGROUPS ============================
+
+    // Cobertura das linhas do teclado
+    covergroup c_linhas @(posedge clk);
+        coverpoint lin_matriz {
+            bins linha_0 = {4'b1110};
+            bins linha_1 = {4'b0111};
+            bins linha_2 = {4'b1011};
+            bins linha_3 = {4'b1101};
+        }
+    endgroup
+
+    // Cobertura das teclas decodificadas
+  	logic [3:0] barramento0_obs;
+    real cobertura_saida;
+
+    covergroup c_saida;
+        coverpoint barramento0_obs {
+            bins tecla_0 = {4'h0};
+            bins tecla_1 = {4'h1};
+            bins tecla_2 = {4'h2};
+            bins tecla_3 = {4'h3};
+            bins tecla_4 = {4'h4};
+            bins tecla_5 = {4'h5};
+            bins tecla_6 = {4'h6};
+            bins tecla_7 = {4'h7};
+            bins tecla_8 = {4'h8};
+            bins tecla_9 = {4'h9};
+        }
+    endgroup
+
+    // Instâncias
+    c_linhas  cov_linhas;
+    c_saida   cov_saida;
 
 	// ========================== MAPEAMENTO DAS TECLAS ==========================
 
@@ -168,41 +203,6 @@ module tb;
             $write("]\n");
         end
     endtask
-
-	// ============================ COVERGROUPS ============================
-
-    // Cobertura das linhas do teclado
-    covergroup c_linhas @(posedge clk);
-        coverpoint lin_matriz {
-            bins linha_0 = {4'b1110};
-            bins linha_1 = {4'b0111};
-            bins linha_2 = {4'b1011};
-            bins linha_3 = {4'b1101};
-        }
-    endgroup
-
-    // Cobertura das teclas decodificadas
-  	logic [3:0] barramento0_obs;
-    real cobertura_saida;
-
-    covergroup c_saida;
-        coverpoint barramento0_obs {
-            bins tecla_0 = {4'h0};
-            bins tecla_1 = {4'h1};
-            bins tecla_2 = {4'h2};
-            bins tecla_3 = {4'h3};
-            bins tecla_4 = {4'h4};
-            bins tecla_5 = {4'h5};
-            bins tecla_6 = {4'h6};
-            bins tecla_7 = {4'h7};
-            bins tecla_8 = {4'h8};
-            bins tecla_9 = {4'h9};
-        }
-    endgroup
-
-    // Instâncias
-    c_linhas  cov_linhas;
-    c_saida   cov_saida;
 
     // ========================== GERADOR RANDÔMICO ==========================
 
