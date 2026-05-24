@@ -160,8 +160,8 @@ module tb;
     endtask
 
   
-      // ============================ COVERGROUPS ============================
-
+    // ============================ COVERGROUPS ============================
+  
     // Cobertura das linhas do teclado
     covergroup c_linhas @(posedge clk);
         coverpoint lin_matriz {
@@ -174,7 +174,8 @@ module tb;
 
     // Cobertura das teclas decodificadas
   	logic [3:0] barramento0_obs;
-
+    real cobertura_saida;
+  
     covergroup c_saida;
         coverpoint digitos_value.digits[0] {
             bins tecla_0 = {4'h0};
@@ -201,43 +202,84 @@ module tb;
     end
   
   
-  
     // ========================== GERADOR RANDÔMICO ==========================
-
-  	// TECLAS	
+  	
+  	// RELEASE 01 - TECLAS	
     int tecla_aleatoria;
     int quantidade_testes;
     bit fim_teste;
 
     initial begin
         while(!fim_teste) begin
- 			// Sorteia tecla de 0 até 9
-          	tecla_aleatoria = $urandom_range(0, 9);
-
-            // Pressiona tecla sorteada
-            pressionar_tecla(tecla_aleatoria[3:0], DEBOUNCE + 20);
-
-          	// Atualizando cobertura
-          	barramento0_obs = digitos_value.digits[0];
-			cov_saida.sample();
           
-            quantidade_testes++;
-
-            // Exibição opcional
-          	$display("------------------ RELEASE 01 --------------------------");
-          	$display("Teste de número #%0d", quantidade_testes);
-          	$display("Tecla sorteada: 0x%0d", tecla_aleatoria);
-          	$display("Tecla lida:     0x%0X", digitos_value.digits[0]);
-            exibir_barramento();
-          	$display("--------------------------------------------------------\n");
+            // Sorteia tecla de 0 até 9
+            tecla_aleatoria = $urandom_range(0, 9);
+          
+            // Pressiona tecla
+            pressionar_tecla(tecla_aleatoria[3:0], DEBOUNCE + 20);
 
             // Pequeno intervalo entre teclas
             repeat($urandom_range(10, 100)) @(posedge clk);
+
         end
     end
   
   	
 
+  	// ======================= MONITORAMENTO =======================
+
+    initial begin
+        logic [3:0] tecla_esperada;
+        logic [3:0] tecla_lida;
+
+        // Espera reset finalizar
+        repeat(30) @(posedge clk);
+
+        while(!fim_teste) begin
+
+            // Espera uma nova tecla ser pressionada
+            @(posedge key_pressed);
+
+            // Guarda tecla esperada
+            tecla_esperada = tecla_aleatoria[3:0];
+
+            // Espera debounce/processamento
+            repeat(DEBOUNCE + 30) @(posedge clk);
+
+            // Lê barramento
+            tecla_lida = digitos_value.digits[0];
+
+            // Atualiza cobertura
+            barramento0_obs = tecla_lida;
+            cov_saida.sample();
+			cobertura_saida = cov_saida.get_coverage();
+
+            // Relatório
+            $display("------------------ RELEASE 01 --------------------------");
+            $display("Teste #%0d", quantidade_testes);
+            $display("Tecla pressionada : 0x%0X", tecla_esperada);
+            $display("Tecla recebida    : 0x%0X", tecla_lida);
+            $display("Cobertura atual   : %0.2f%%", cov_saida.get_coverage());
+
+            exibir_barramento();
+          	quantidade_testes++;
+
+            // Verificação
+            if(tecla_lida === tecla_esperada) begin
+                $display("RESULTADO: PASSOU");
+            end
+            else begin
+                $display("RESULTADO: FALHOU");
+              	$fatal();
+            end
+
+            $display("--------------------------------------------------------\n");
+
+        end
+
+    end
+  
+  
 
     // ============================ FINALIZAÇÃO ============================
 
@@ -249,14 +291,13 @@ module tb;
         active_lin   = 4'b1111;
         active_col   = 4'b1111;
 
-        quantidade_testes = 0;
         fim_teste         = 0;
 
         resetar();
 
         // Espera cobertura total
-        wait(cov_saida.get_coverage() == 100 && quantidade_testes >= 50);
-        fim_teste = 1;
+       	wait(cobertura_saida >= 100.0);
+		fim_teste = 1;
 
         repeat(20) @(posedge clk);
 
