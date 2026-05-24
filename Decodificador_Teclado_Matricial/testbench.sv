@@ -203,6 +203,8 @@ module tb;
             $write("]\n");
         end
     endtask
+  
+  
 
     // ========================== GERADOR RANDÔMICO ==========================
 
@@ -279,6 +281,38 @@ module tb;
                 // Intervalo aleatório entre teclas
                 repeat($urandom_range(10, 100)) @(posedge clk);
             end
+        end
+    endtask
+
+    // ========================== GERADOR DA RELEASE 05 ==========================
+  
+  	// Variáveis auxiliares release 05
+  	bit fim_teste;
+	bit monitor_pronto;
+	int quantidade_testes;
+    localparam int QTD_MAX_DIGITOS = 20;
+    logic [3:0] sequencia_release_05 [QTD_MAX_DIGITOS];
+    int qtd_digitos_release_05;
+  
+    task automatic gerador_release_05();
+        begin
+            // Sorteia quantos dígitos serão digitados nesta execução
+            qtd_digitos_release_05 = $urandom_range(1, QTD_MAX_DIGITOS);
+
+            for (int i = 0; i < qtd_digitos_release_05; i++) begin
+                sequencia_release_05[i] = $urandom_range(0, 9);
+            end
+
+            for (int i = 0; i < qtd_digitos_release_05; i++) begin
+                pressionar_tecla(sequencia_release_05[i], DEBOUNCE + 50);
+            end
+
+            // Confirma com *
+            $display("Pressionando tecla * para confirmar");
+            pressionar_tecla(4'd11, DEBOUNCE + 50);
+
+            // Espera o monitor finalizar a checagem
+            wait(fim_teste);
         end
     endtask
 
@@ -476,6 +510,97 @@ module tb;
             end
         end
     endtask
+  
+  
+  	// MONITORAMENTO RELEASE 05
+  	task automatic monitor_release_05();
+
+        bit valid_encontrado;
+        int ciclos;
+
+        begin
+            repeat(30) @(posedge clk);
+
+            monitor_pronto = 1;
+
+            while(!fim_teste) begin
+
+                $display("------------------ RELEASE 05 --------------------------");
+                $display("Teste #%0d", quantidade_testes + 1);
+
+                // Espera tecla * ser pressionada
+                wait(
+                    key_pressed &&
+                    active_lin == KEY_LIN[11] &&
+                    active_col == KEY_COL[11]
+                );
+
+                valid_encontrado = 0;
+
+                // Espera digitos_valid
+                for(ciclos = 0;
+                    ciclos < ACIONAMENTO_MAXIMO;
+                    ciclos++) begin
+
+                    @(posedge clk);
+
+                    if(digitos_valid) begin
+                        valid_encontrado = 1;
+                        break;
+                    end
+                end
+
+                // Timeout
+                if(!valid_encontrado) begin
+                    $display("RESULTADO: FALHOU");
+                    $display("digitos_valid nao ativou");
+                    $fatal();
+                end
+
+                // Comparação do barramento
+                for(int i = 0; i < qtd_digitos_release_05; i++) begin
+
+                    if(
+                        digitos_value.digits[i]
+                        !==
+                        sequencia_release_05[
+                            qtd_digitos_release_05 - 1 - i
+                        ]
+                    ) begin
+
+                        $display("RESULTADO: FALHOU");
+                        $display("Posicao %0d", i);
+
+                        $display(
+                            "Esperado : %0d",
+                            sequencia_release_05[
+                                qtd_digitos_release_05 - 1 - i
+                            ]
+                        );
+
+                        $display(
+                            "Recebido : %0d",
+                            digitos_value.digits[i]
+                        );
+
+                        exibir_barramento();
+
+                        $fatal();
+                    end
+                end
+
+                $display("RESULTADO: PASSOU");
+
+                exibir_barramento();
+
+                $display("--------------------------------------------------------\n");
+
+                quantidade_testes++;
+
+                fim_teste = 1;
+            end
+        end
+	endtask
 
     // ============================ EXECUÇÃO DAS RELEASES ============================
 
@@ -553,14 +678,53 @@ task automatic executar_release_03();
         end
     endtask
   
+  	// RELEASE 05
+    task automatic executar_release_05();
+        begin
+            $display("\n====================== RELEASE 05 ======================\n");
+            
+            quantidade_testes = 0;
+
+          
+          	for (int rodada = 1; rodada <= 25; rodada++) begin
+                fim_teste         = 0;
+                monitor_pronto    = 0;
+                cobertura_saida   = 0.0;
+
+
+                soltar_tecla();
+
+                fork : BLOCO_RELEASE_05
+                    monitor_release_05();
+                    begin
+                        wait(monitor_pronto);
+                        gerador_release_05();
+                    end
+                join_any
+
+                disable BLOCO_RELEASE_05;
+                
+
+                repeat(50) @(posedge clk);
+            end
+
+            $display("\n====================================================");
+            $display(" RELEASE 05 FINALIZADA ");
+            $display(" Quantidade de sequências testadas: %0d", quantidade_testes);
+            $display("====================================================\n");
+        end
+    endtask
+  
     task automatic executar_todas_releases();
         begin
             executar_release_01();
           	executar_release_02();
           	executar_release_03();
+          
+          	executar_release_05();
 
             // Quando for adicionar novas releases, siga este padrão:
-            // executar_release_04();
+            // executar_release_03();
         end
     endtask
 
