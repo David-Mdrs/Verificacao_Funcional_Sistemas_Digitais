@@ -8,7 +8,7 @@ module tb;
     localparam int DEBOUNCE     		= 50;	// Leitura da tecla
     localparam int REPETIR_01 			= 2000;	// 2s pressionando tecla
     localparam int REPETIR_02   		= 1000;	// 1s pressionando tecla
-  	localparam int ACIONAMENTO_MAXIMO = 120;	// Máximos de pulsos para confirmar
+  	localparam int ACIONAMENTO_MAXIMO 	= 120;	// Máximos de pulsos para confirmar
 
   	// Declarando variáveis do design
     logic clk;
@@ -16,9 +16,9 @@ module tb;
     logic enable;
 
     logic [3:0] col_matriz;
-    wire  [3:0] lin_matriz;
+    logic  [3:0] lin_matriz;
 
-    digitosPac_t digitos_value;
+    senhaPac_t digitos_value;
     logic digitos_valid;
 
   	// Inicializando variáveis
@@ -40,15 +40,51 @@ module tb;
         .digitos_value(digitos_value),	// Output
         .digitos_valid(digitos_valid)	// Output
     );
-  
-  
-
 
 	// ========================== MAPEAMENTO DAS TECLAS ==========================
   
     logic [3:0] KEY_LIN [12];
     logic [3:0] KEY_COL [12];
+  	
+  	initial begin
+		KEY_LIN[0]  = 4'b1110;
+		KEY_COL[0]  = 4'b1011;
 
+		KEY_LIN[1]  = 4'b0111;
+		KEY_COL[1]  = 4'b0111;
+
+		KEY_LIN[2]  = 4'b0111;
+		KEY_COL[2]  = 4'b1011;
+
+		KEY_LIN[3]  = 4'b0111;
+		KEY_COL[3]  = 4'b1101;
+
+		KEY_LIN[4]  = 4'b1011;
+		KEY_COL[4]  = 4'b0111;
+
+		KEY_LIN[5]  = 4'b1011;
+		KEY_COL[5]  = 4'b1011;
+
+		KEY_LIN[6]  = 4'b1011;
+		KEY_COL[6]  = 4'b1101;
+
+		KEY_LIN[7]  = 4'b1101;
+		KEY_COL[7]  = 4'b0111;
+
+		KEY_LIN[8]  = 4'b1101;
+		KEY_COL[8]  = 4'b1011;
+
+		KEY_LIN[9]  = 4'b1101;
+		KEY_COL[9]  = 4'b1101;
+
+  		// Tecla (#)
+ 		KEY_LIN[10] = 4'b1110;
+  		KEY_COL[10] = 4'b1101;
+
+    	// Tecla (*)
+  		KEY_LIN[11] = 4'b1110;
+  		KEY_COL[11] = 4'b0111;
+    end
   
 	// =========================== CONTROLE DO TECLADO ===========================
   
@@ -72,8 +108,7 @@ module tb;
     // RESET
     task automatic resetar();
         begin
-            $display("\n================ RESET ================\n");
-
+          	$display("\n====================== RESET =======================\n");
             rst = 1;
             key_pressed = 0;
 
@@ -83,8 +118,8 @@ module tb;
         end
     endtask
 
-    // PRESSIONAR TECLA
-    task automatic pressionar_tecla(input logic [3:0] tecla);
+    // ACIONAR TECLA
+    task automatic acionar_tecla(input logic [3:0] tecla);
         begin
             active_lin  = KEY_LIN[tecla];
             active_col  = KEY_COL[tecla];
@@ -104,14 +139,13 @@ module tb;
     // PRESSIONAR TECLA
   	task automatic pressionar_tecla(input logic [3:0] tecla, input int ciclos);
         begin
-            pressionar_tecla(tecla);
+            acionar_tecla(tecla);
             repeat(ciclos) @(posedge clk);
 
             soltar_tecla();
             repeat(10) @(posedge clk);
         end
     endtask
-
     
     // EXIBIR BARRAMENTO
     task automatic exibir_barramento();
@@ -125,4 +159,113 @@ module tb;
         end
     endtask
 
+  
+      // ============================ COVERGROUPS ============================
+
+    // Cobertura das linhas do teclado
+    covergroup c_linhas @(posedge clk);
+        coverpoint lin_matriz {
+            bins linha_0 = {4'b1110};
+            bins linha_1 = {4'b0111};
+            bins linha_2 = {4'b1011};
+            bins linha_3 = {4'b1101};
+        }
+    endgroup
+
+    // Cobertura das teclas decodificadas
+  	logic [3:0] barramento0_obs;
+
+    covergroup c_saida;
+        coverpoint digitos_value.digits[0] {
+            bins tecla_0 = {4'h0};
+            bins tecla_1 = {4'h1};
+            bins tecla_2 = {4'h2};
+            bins tecla_3 = {4'h3};
+            bins tecla_4 = {4'h4};
+            bins tecla_5 = {4'h5};
+            bins tecla_6 = {4'h6};
+            bins tecla_7 = {4'h7};
+            bins tecla_8 = {4'h8};
+            bins tecla_9 = {4'h9};
+        }
+    endgroup
+
+    // Instâncias
+    c_linhas  cov_linhas;
+    c_saida   cov_saida;
+
+    // Inicialização
+    initial begin
+        cov_linhas  = new();
+        cov_saida   = new();
+    end
+  
+  
+  
+    // ========================== GERADOR RANDÔMICO ==========================
+
+  	// TECLAS	
+    int tecla_aleatoria;
+    int quantidade_testes;
+    bit fim_teste;
+
+    initial begin
+        while(!fim_teste) begin
+ 			// Sorteia tecla de 0 até 9
+          	tecla_aleatoria = $urandom_range(0, 9);
+
+            // Pressiona tecla sorteada
+            pressionar_tecla(tecla_aleatoria[3:0], DEBOUNCE + 20);
+
+          	// Atualizando cobertura
+          	barramento0_obs = digitos_value.digits[0];
+			cov_saida.sample();
+          
+            quantidade_testes++;
+
+            // Exibição opcional
+          	$display("------------------ RELEASE 01 --------------------------");
+          	$display("Teste de número #%0d", quantidade_testes);
+          	$display("Tecla sorteada: 0x%0d", tecla_aleatoria);
+          	$display("Tecla lida:     0x%0X", digitos_value.digits[0]);
+            exibir_barramento();
+          	$display("--------------------------------------------------------\n");
+
+            // Pequeno intervalo entre teclas
+            repeat($urandom_range(10, 100)) @(posedge clk);
+        end
+    end
+  
+  	
+
+
+    // ============================ FINALIZAÇÃO ============================
+
+    initial begin
+        rst          = 0;
+        enable       = 1;
+        key_pressed  = 0;
+
+        active_lin   = 4'b1111;
+        active_col   = 4'b1111;
+
+        quantidade_testes = 0;
+        fim_teste         = 0;
+
+        resetar();
+
+        // Espera cobertura total
+        wait(cov_saida.get_coverage() == 100 && quantidade_testes >= 50);
+        fim_teste = 1;
+
+        repeat(20) @(posedge clk);
+
+        $display("\n====================================================");
+        $display(" COBERTURA TOTAL ATINGIDA ");
+        $display(" Quantidade de testes: %0d", quantidade_testes);
+        $display("====================================================\n");
+
+        $finish;
+
+    end
 endmodule
