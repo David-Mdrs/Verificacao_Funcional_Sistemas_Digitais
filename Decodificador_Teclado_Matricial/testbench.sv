@@ -211,6 +211,7 @@ module tb;
     bit fim_teste;
     bit monitor_pronto;
 
+  	// GERADOR RELEASE 01
     task automatic gerador_release_01();
         begin
             while(!fim_teste) begin
@@ -225,9 +226,36 @@ module tb;
             end
         end
     endtask
+  
+  
+  	// GERADOR RELEASE 02
+    task automatic gerador_release_02();
+        begin
+              // Preenchendo barramento duas vezes
+            for(int j = 0; j < 2; j++) begin
+                for(int i = 0; i <= 9; i++) begin
+                    pressionar_tecla(i[3:0], DEBOUNCE + 20);
+                end
+            end
+
+            // Gerando sequência aleatória
+            while(!fim_teste) begin
+
+                // Sorteia tecla de 0 até 9
+                tecla_aleatoria = $urandom_range(0, 9);
+
+                // Pressiona tecla
+                pressionar_tecla(tecla_aleatoria[3:0], DEBOUNCE + 20);
+              
+                // Pequeno intervalo entre teclas
+                repeat($urandom_range(10, 100)) @(posedge clk);
+            end
+        end
+  	endtask
 
 	// ======================= MONITORAMENTO =======================
 
+  	// MONITORAMENTO RELEASE 01
     task automatic monitor_release_01();
         logic [3:0] tecla_esperada;
         logic [3:0] tecla_lida;
@@ -259,8 +287,8 @@ module tb;
                 // Relatório
                 $display("------------------ RELEASE 01 --------------------------");
                 $display("Teste #%0d", quantidade_testes);
-                $display("Tecla pressionada : 0x%0X", tecla_esperada);
-                $display("Tecla recebida    : 0x%0X", tecla_lida);
+              	$display("Tecla esperada : 0x%0X", tecla_esperada);
+              	$display("Tecla lida    : 0x%0X", tecla_lida);
                 $display("Cobertura atual   : %0.2f%%", cov_saida.get_coverage());
 
                 exibir_barramento();
@@ -284,9 +312,91 @@ module tb;
             end
         end
     endtask
+  
+  
+  	// MONITORAMENTO RELEASE 02
+    task automatic monitor_release_02();
+        begin
+            senhaPac_t barramento_esperado;
+            senhaPac_t barramento_lido;
+            logic [3:0] nova_tecla;
+            bit iniciado = 0;
+
+            repeat(30) @(posedge clk);
+
+            // Inicializa buffer esperado com 'F' (vazio)
+            for(int i = 0; i < 20; i++)
+                barramento_esperado.digits[i] = 4'hF;
+
+            while(!fim_teste) begin
+                // Espera uma nova tecla ser pressionada
+                @(posedge key_pressed);
+
+                // Mapeando tecla
+                nova_tecla = 4'hF;
+                for(int k = 0; k < 12; k++) begin
+                    if(KEY_LIN[k] === active_lin && KEY_COL[k] === active_col) begin
+                        nova_tecla = k[3:0];
+                        break;
+                    end
+                end
+
+                repeat(DEBOUNCE + 15) @(posedge clk);
+
+              	// Lê barramento
+                barramento_lido = digitos_value;
+
+                barramento0_obs = nova_tecla; 
+                cov_saida.sample();
+                cobertura_saida = cov_saida.get_coverage();
+
+                if(!iniciado) begin
+                    barramento_esperado = barramento_lido;
+                    iniciado = 1;
+                end
+                else begin
+                    // Shift manual para teste
+                    for(int k = 19; k > 0; k--)
+                        barramento_esperado.digits[k] = barramento_esperado.digits[k-1];
+
+                    barramento_esperado.digits[0] = nova_tecla;
+                end
+
+                $display("------------------ RELEASE 02 --------------------------");
+
+                $write("Barramento: [ ");
+                for(int i = 19; i >= 0; i--)
+                    $write("%0X ", digitos_value.digits[i]);
+                $write("]\n");
+
+                exibir_barramento();
+              
+                $display("Tecla detectada: %0X", nova_tecla);
+
+              	// Comparando barramento esperado com o real
+                for(int i = 0; i < 20; i++) begin
+                    if(barramento_lido.digits[i] !== barramento_esperado.digits[i]) begin
+                      	$display("STATUS: ERRO DE SHIFT");
+                        $fatal();
+                    end
+                end
+
+                $display("STATUS: OK | Barramento atualizado corretamente.");
+                $display("--------------------------------------------------------\n");
+
+                @(negedge key_pressed);
+              
+              	quantidade_testes++;
+              	if(quantidade_testes >= 50) begin
+                    fim_teste = 1;
+                end
+            end
+        end
+    endtask
 
     // ============================ EXECUÇÃO DAS RELEASES ============================
 
+  	// RELEASE 01
     task automatic executar_release_01();
         begin
             $display("\n====================== RELEASE 01 ======================\n");
@@ -313,13 +423,36 @@ module tb;
             $display("====================================================\n");
         end
     endtask
+  
+  	// RELEASE 02
+    task automatic executar_release_02();
+        begin
+            $display("\n====================== RELEASE 02 ======================\n");
 
+          	fim_teste       = 0; 
+            monitor_pronto  = 0;
+            soltar_tecla();
+            repeat(5) @(posedge clk);
+          
+            fork : R02
+                gerador_release_02();
+                monitor_release_02();
+            join_any
+
+            disable R02;
+
+            $display("\n====================================================");
+            $display(" RELEASE 02 FINALIZADA ");
+            $display("====================================================\n");
+        end
+    endtask
+  
     task automatic executar_todas_releases();
         begin
             executar_release_01();
+          	executar_release_02();
 
             // Quando for adicionar novas releases, siga este padrão:
-            // executar_release_02();
             // executar_release_03();
         end
     endtask
