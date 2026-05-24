@@ -204,7 +204,6 @@ module tb;
         end
     endtask
   
-  
 
     // ========================== GERADOR RANDÔMICO ==========================
 
@@ -283,9 +282,33 @@ module tb;
             end
         end
     endtask
-
-    // ========================== GERADOR DA RELEASE 05 ==========================
   
+  	// GERADOR RELEASE 04
+    logic [3:0] r04_tecla_alvo;
+    int         r04_falhas;
+
+    task automatic gerador_release_04();
+        begin
+            r04_tecla_alvo = $urandom_range(0, 9);
+
+            $display("--------------------------------------------------------");
+            $display("RELEASE 04 - Iniciando teste de repeticao automatica");
+            $display("Tecla sorteada    : 0x%0X (%0d)", r04_tecla_alvo, r04_tecla_alvo);
+            $display("Linha varrida     : 0b%04b | Coluna: 0b%04b",
+                     KEY_LIN[r04_tecla_alvo], KEY_COL[r04_tecla_alvo]);
+            $display("--------------------------------------------------------");
+
+            acionar_tecla(r04_tecla_alvo);
+            repeat(DEBOUNCE + REPETIR_01 + (REPETIR_02 * 2) + 200) @(posedge clk);
+
+            soltar_tecla();
+            repeat(REPETIR_02 + 200) @(posedge clk);
+            fim_teste = 1;
+        end
+    endtask
+
+
+    // GERADOR DA RELEASE 05
   	// Variáveis auxiliares release 05
   	bit fim_teste;
 	bit monitor_pronto;
@@ -511,6 +534,106 @@ module tb;
         end
     endtask
   
+    task automatic monitor_release_04();
+        logic [3:0] tecla_esperada;
+        logic [3:0] barramento_copia [20];
+        int         falhas_locais;
+        begin
+            repeat(30) @(posedge clk);
+            monitor_pronto = 1;
+            @(posedge key_pressed);
+            falhas_locais = 0;
+
+            repeat(DEBOUNCE + 20) @(posedge clk);
+            tecla_esperada = r04_tecla_alvo;
+
+            $display("------------------ RELEASE 04 --------------------------");
+            $display("Sub-teste A: 1a insercao normal (apos %0d ciclos de debounce)", DEBOUNCE);
+            $display("Saida esperada    - digits[0]: 0x%0X", tecla_esperada);
+            $display("Saida recebida    - digits[0]: 0x%0X", digitos_value.digits[0]);
+            exibir_barramento();
+            if(digitos_value.digits[0] === tecla_esperada)
+                $display("RESULTADO: PASSOU");
+            else begin
+                $display("RESULTADO: FALHOU");
+                falhas_locais++;
+            end
+            $display("--------------------------------------------------------\n");
+
+            repeat(REPETIR_01) @(posedge clk);
+            $display("------------------ RELEASE 04 --------------------------");
+            $display("Sub-teste B: 1a repeticao automatica apos %0d ciclos (2 s)", REPETIR_01);
+            $display("Saida esperada    - digits[0]: 0x%0X | digits[1]: 0x%0X",
+                     tecla_esperada, tecla_esperada);
+            $display("Saida recebida    - digits[0]: 0x%0X | digits[1]: 0x%0X",
+                     digitos_value.digits[0], digitos_value.digits[1]);
+            exibir_barramento();
+            if(digitos_value.digits[1] === tecla_esperada && digitos_value.digits[0] === tecla_esperada)
+                $display("RESULTADO: PASSOU");
+            else begin
+                $display("RESULTADO: FALHOU — 1a repeticao nao ocorreu apos 2 s");
+                $display("          (Verifique se o DUT implementa auto-repeat no estado HOLD)");
+                falhas_locais++;
+            end
+            $display("--------------------------------------------------------\n");
+
+            repeat(REPETIR_02) @(posedge clk);
+            $display("------------------ RELEASE 04 --------------------------");
+            $display("Sub-teste C: 2a repeticao automatica apos %0d ciclos (1 s)", REPETIR_02);
+            $display("Saida esperada    - digits[2]: 0x%0X", tecla_esperada);
+            $display("Saida recebida    - digits[2]: 0x%0X", digitos_value.digits[2]);
+            exibir_barramento();
+            if(digitos_value.digits[2] === tecla_esperada)
+                $display("RESULTADO: PASSOU");
+            else begin
+                $display("RESULTADO: FALHOU — 2a repeticao nao ocorreu");
+                falhas_locais++;
+            end
+            $display("--------------------------------------------------------\n");
+
+            repeat(REPETIR_02) @(posedge clk);
+            $display("------------------ RELEASE 04 --------------------------");
+            $display("Sub-teste D: 3a repeticao automatica apos mais %0d ciclos (1 s)", REPETIR_02);
+            $display("Saida esperada    - digits[3]: 0x%0X", tecla_esperada);
+            $display("Saida recebida    - digits[3]: 0x%0X", digitos_value.digits[3]);
+            exibir_barramento();
+            if(digitos_value.digits[3] === tecla_esperada)
+                $display("RESULTADO: PASSOU");
+            else begin
+                $display("RESULTADO: FALHOU — 3a repeticao nao ocorreu");
+                falhas_locais++;
+            end
+            $display("--------------------------------------------------------\n");
+
+            @(negedge key_pressed);
+            repeat(10) @(posedge clk);
+            for(int i = 0; i < 20; i++) barramento_copia[i] = digitos_value.digits[i];
+
+            $display("------------------ RELEASE 04 --------------------------");
+            $display("Sub-teste E: Barramento deve congelar apos soltar a tecla");
+            $display("Aguardando %0d ciclos sem nova pressao...", REPETIR_02 + 100);
+            exibir_barramento();
+            repeat(REPETIR_02 + 100) @(posedge clk);
+
+            begin
+                int mudancas = 0;
+                for(int i = 0; i < 20; i++)
+                    if(digitos_value.digits[i] !== barramento_copia[i]) mudancas++;
+                $display("Posicoes alteradas: %0d (esperado: 0)", mudancas);
+                if(mudancas == 0)
+                    $display("RESULTADO: PASSOU — Barramento estavel apos soltar a tecla");
+                else begin
+                    $display("RESULTADO: FALHOU — Barramento alterado apos soltar a tecla");
+                    falhas_locais++;
+                end
+            end
+            $display("--------------------------------------------------------\n");
+
+            r04_falhas = falhas_locais;
+            quantidade_testes++;
+        end
+    endtask
+  
   
   	// MONITORAMENTO RELEASE 05
   	task automatic monitor_release_05();
@@ -678,6 +801,32 @@ task automatic executar_release_03();
         end
     endtask
   
+  	// RELEASE 04
+    task automatic executar_release_04();
+        begin
+            $display("\n====================== RELEASE 04 ======================\n");
+            fim_teste      = 0;
+            monitor_pronto = 0;
+            r04_falhas     = 0;
+            soltar_tecla();
+
+            fork : BLOCO_RELEASE_04
+                monitor_release_04();
+                begin
+                    wait(monitor_pronto);
+                    gerador_release_04();
+                end
+            join_any
+            disable BLOCO_RELEASE_04;
+
+            $display("\n====================================================");
+            $display(" RELEASE 04 FINALIZADA ");
+            $display(" Sub-testes executados : 5 (A, B, C, D, E)");
+            $display(" Falhas encontradas    : %0d", r04_falhas);
+            $display("====================================================\n");
+        end
+    endtask
+  
   	// RELEASE 05
     task automatic executar_release_05();
         begin
@@ -720,7 +869,7 @@ task automatic executar_release_03();
             executar_release_01();
           	executar_release_02();
           	executar_release_03();
-          
+          	executar_release_04();
           	executar_release_05();
 
             // Quando for adicionar novas releases, siga este padrão:
